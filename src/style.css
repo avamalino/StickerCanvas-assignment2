@@ -3,3 +3,10 @@
   vertical-align: top;
   border: 1px solid salmon;
 }
+
+#cvs {
+  width: 256;
+  height: 256;
+  border: 5px, solid #000000;
+  border-radius: 10px;
+}
