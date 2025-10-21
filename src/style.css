@@ -5,8 +5,8 @@
 }
 
 #cvs {
-  width: 256;
-  height: 256;
+  width: 1000;
+  height: 1000;
   border: 5px, solid #000000;
   border-radius: 10px;
 }
