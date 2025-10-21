@@ -20,6 +20,7 @@ const cursor = { active: false, x: 0, y: 0 };
 type Point = { X: number; Y: number };
 const strokes: Point[][] = [];
 let currentStroke: Point[] = [];
+const undoneStrokes: Point[][] = [];
 
 canvas.addEventListener("mousedown", (event) => {
   cursor.active = true;
@@ -102,4 +103,26 @@ document.body.append(clearButton);
 clearButton.addEventListener("click", () => {
   context.clearRect(0, 0, canvas.width, canvas.height);
   strokes.length = 0;
+  undoneStrokes.length = 0;
+});
+
+const undoButton = document.createElement("button");
+undoButton.innerHTML = "undo";
+document.body.append(undoButton);
+undoButton.addEventListener("click", () => {
+  if (strokes.length === 0) return;
+  const undoneStroke = strokes.pop()!;
+  undoneStrokes.push(undoneStroke);
+  canvas.dispatchEvent(new Event("drawEvent"));
+  console.log(undoneStroke);
+});
+
+const redoButton = document.createElement("button");
+redoButton.innerHTML = "redo";
+document.body.append(redoButton);
+redoButton.addEventListener("click", () => {
+  if (undoneStrokes.length === 0) return;
+  const redoneStroke = undoneStrokes.pop()!;
+  strokes.push(redoneStroke);
+  canvas.dispatchEvent(new Event("drawEvent"));
 });
