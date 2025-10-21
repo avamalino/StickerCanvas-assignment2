@@ -17,10 +17,28 @@ gradient.addColorStop(1, "purple");
 
 const cursor = { active: false, x: 0, y: 0 };
 
+interface Drawable {
+  display(context: CanvasRenderingContext2D): void;
+}
+
+function DrawLine(points: Point[]) {
+  return {
+    display(context: CanvasRenderingContext2D) {
+      if (points.length === 0) return;
+      context.beginPath();
+      context.moveTo(points[0].X, points[0].Y);
+      for (let i = 1; i < points.length; i++) {
+        context.lineTo(points[i].X, points[i].Y);
+      }
+      context.stroke();
+    },
+  };
+}
+
 type Point = { X: number; Y: number };
-const strokes: Point[][] = [];
+const displayList: Drawable[] = [];
 let currentStroke: Point[] = [];
-const undoneStrokes: Point[][] = [];
+const undoneStrokes: Drawable[] = [];
 
 canvas.addEventListener("mousedown", (event) => {
   cursor.active = true;
@@ -29,34 +47,13 @@ canvas.addEventListener("mousedown", (event) => {
   currentStroke = [];
 });
 
-canvas.addEventListener("touchstart", () => {
-  cursor.active = true;
-  //cursor.x = event.offsetX;
-  //cursor.y = event.offsetY;
-  currentStroke = [];
-});
-//const customEvent = new CustomEvent("drawEvent", {
-//  detail: { message: "Hellow from custom Event!" },
-//});
-//
-
 canvas.addEventListener("drawEvent", () => {
-  //const customEvent = event as CustomEvent;
   console.log("hi");
 
   context.clearRect(0, 0, canvas.width, canvas.height);
-  //context.beginPath();
-  for (const stroke of strokes) {
-    if (stroke.length === 0) continue;
-    context.beginPath();
-    context.moveTo(stroke[0].X, stroke[0].Y);
-    //context.moveTo(points[0].X, points[0].Y);
-    for (let i = 1; i < stroke.length; i++) {
-      context.lineTo(stroke[i].X, stroke[i].Y);
-    }
-    context.stroke();
+  for (const drawable of displayList) {
+    drawable.display(context);
   }
-
   if (currentStroke.length > 0) {
     context.beginPath();
     context.moveTo(currentStroke[0].X, currentStroke[0].Y);
@@ -65,10 +62,7 @@ canvas.addEventListener("drawEvent", () => {
     }
     context.stroke();
   }
-  //context.stroke();
 });
-
-//canvas.dispatchEvent(customEvent);
 
 canvas.addEventListener("mousemove", (event) => {
   if (!cursor.active) return;
@@ -80,17 +74,10 @@ canvas.addEventListener("mousemove", (event) => {
   canvas.dispatchEvent(new Event("drawEvent"));
 });
 
-//canvas.addEventListener("touchmove", (event) => {
-//  if (!cursor.active) return;
-//    context.fillStyle = gradient; //ill figure out later
-//
-//    cursor.x = event.offsetX;
-//
-//} //do this later
-
 canvas.addEventListener("mouseup", () => {
   if (cursor.active && currentStroke.length > 0) {
-    strokes.push(currentStroke);
+    const lineCommand = DrawLine([...currentStroke]);
+    displayList.push(lineCommand);
     currentStroke = [];
   }
   cursor.active = false;
@@ -102,7 +89,7 @@ clearButton.innerHTML = "clear";
 document.body.append(clearButton);
 clearButton.addEventListener("click", () => {
   context.clearRect(0, 0, canvas.width, canvas.height);
-  strokes.length = 0;
+  displayList.length = 0;
   undoneStrokes.length = 0;
 });
 
@@ -110,8 +97,8 @@ const undoButton = document.createElement("button");
 undoButton.innerHTML = "undo";
 document.body.append(undoButton);
 undoButton.addEventListener("click", () => {
-  if (strokes.length === 0) return;
-  const undoneStroke = strokes.pop()!;
+  if (displayList.length === 0) return;
+  const undoneStroke = displayList.pop()!;
   undoneStrokes.push(undoneStroke);
   canvas.dispatchEvent(new Event("drawEvent"));
   console.log(undoneStroke);
@@ -123,6 +110,6 @@ document.body.append(redoButton);
 redoButton.addEventListener("click", () => {
   if (undoneStrokes.length === 0) return;
   const redoneStroke = undoneStrokes.pop()!;
-  strokes.push(redoneStroke);
+  displayList.push(redoneStroke);
   canvas.dispatchEvent(new Event("drawEvent"));
 });
