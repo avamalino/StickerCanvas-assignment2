@@ -37,6 +37,19 @@ function DrawLine(points: Point[], width: number) {
     },
   };
 }
+let preview: Drawable | null = null;
+//ctx: CanvasRenderingContext2D, x: number, y: number, radius: number
+function fillCircle(point: Point, radius: number, width: number): Drawable {
+  return {
+    display(context: CanvasRenderingContext2D) {
+      context.beginPath();
+      context.arc(point.X, point.Y, radius * width, 0, Math.PI * 2);
+      context.fillStyle = "#C4C4C4";
+      context.fill();
+      context.closePath();
+    },
+  };
+}
 
 type Point = { X: number; Y: number };
 const displayList: Drawable[] = [];
@@ -57,6 +70,7 @@ canvas.addEventListener("drawEvent", () => {
   for (const drawable of displayList) {
     drawable.display(context);
   }
+
   if (currentStroke.length > 0) {
     context.lineWidth = currentWidth;
     context.beginPath();
@@ -66,16 +80,25 @@ canvas.addEventListener("drawEvent", () => {
     }
     context.stroke();
   }
+
+  if (!cursor.active && preview !== null) {
+    preview.display(context);
+  }
 });
 
 canvas.addEventListener("mousemove", (event) => {
-  if (!cursor.active) return;
-  context.fillStyle = gradient; //ill figure out later
-
   cursor.x = event.offsetX;
   cursor.y = event.offsetY;
-  currentStroke.push({ X: cursor.x, Y: cursor.y });
-  canvas.dispatchEvent(new Event("drawEvent"));
+
+  if (!cursor.active) {
+    preview = fillCircle({ X: cursor.x, Y: cursor.y }, 5, currentWidth);
+    canvas.dispatchEvent(new Event("drawEvent"));
+  } else {
+    context.fillStyle = gradient; //ill figure out later
+
+    currentStroke.push({ X: cursor.x, Y: cursor.y });
+    canvas.dispatchEvent(new Event("drawEvent"));
+  }
 });
 
 canvas.addEventListener("mouseup", () => {
