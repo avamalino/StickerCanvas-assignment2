@@ -21,10 +21,13 @@ interface Drawable {
   display(context: CanvasRenderingContext2D): void;
 }
 
-function DrawLine(points: Point[]) {
+let currentWidth = 2;
+function DrawLine(points: Point[], width: number) {
   return {
     display(context: CanvasRenderingContext2D) {
       if (points.length === 0) return;
+      context.lineWidth = width;
+      context.strokeStyle = "black";
       context.beginPath();
       context.moveTo(points[0].X, points[0].Y);
       for (let i = 1; i < points.length; i++) {
@@ -55,6 +58,7 @@ canvas.addEventListener("drawEvent", () => {
     drawable.display(context);
   }
   if (currentStroke.length > 0) {
+    context.lineWidth = currentWidth;
     context.beginPath();
     context.moveTo(currentStroke[0].X, currentStroke[0].Y);
     for (let i = 1; i < currentStroke.length; i++) {
@@ -76,7 +80,7 @@ canvas.addEventListener("mousemove", (event) => {
 
 canvas.addEventListener("mouseup", () => {
   if (cursor.active && currentStroke.length > 0) {
-    const lineCommand = DrawLine([...currentStroke]);
+    const lineCommand = DrawLine([...currentStroke], currentWidth);
     displayList.push(lineCommand);
     currentStroke = [];
   }
@@ -112,4 +116,26 @@ redoButton.addEventListener("click", () => {
   const redoneStroke = undoneStrokes.pop()!;
   displayList.push(redoneStroke);
   canvas.dispatchEvent(new Event("drawEvent"));
+});
+
+const thinButton = document.createElement("button");
+thinButton.innerHTML = "thin";
+thinButton.style.fontSize = "20px";
+document.body.append(thinButton);
+
+thinButton.addEventListener("click", () => {
+  currentWidth = 2;
+  thinButton.style.outline = "2px solid blue";
+  thickButton.style.outline = "";
+});
+
+const thickButton = document.createElement("button");
+thickButton.innerHTML = "thick";
+thickButton.style.fontSize = "30px";
+document.body.append(thickButton);
+
+thickButton.addEventListener("click", () => {
+  currentWidth = 5;
+  thickButton.style.outline = "2px solid blue";
+  thinButton.style.outline = "";
 });
