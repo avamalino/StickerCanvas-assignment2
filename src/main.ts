@@ -1,6 +1,8 @@
 //import exampleIconUrl from "./noun-paperclip-7598668-00449F.png";
 import "./style.css";
 import noelleURL from "./noelle2.png";
+import qiqiURL from "./qiqi2.jpg";
+import scaraURL from "./scara2.webp";
 
 document.body.innerHTML = `
   <h1> Herro <h1>
@@ -22,7 +24,6 @@ interface Drawable {
   display(context: CanvasRenderingContext2D): void;
 }
 
-let currentWidth = 2;
 function DrawLine(points: Point[], width: number) {
   return {
     display(context: CanvasRenderingContext2D) {
@@ -53,7 +54,6 @@ function DrawImage(
 }
 
 let preview: Drawable | null = null;
-//ctx: CanvasRenderingContext2D, x: number, y: number, radius: number
 function fillCircle(point: Point, radius: number, width: number): Drawable {
   return {
     display(context: CanvasRenderingContext2D) {
@@ -73,21 +73,16 @@ const undoneStrokes: Drawable[] = [];
 
 const noelleImage = new Image();
 noelleImage.src = noelleURL;
-
-//noelleImage.onload = () => {
-//  console.log("noelle loaded");
-//  context.drawImage(noelleImage, 0, 0, canvas.width, canvas.height);
-//};
-//noelleImage.onerror = (err) => {
-//  console.error("failed to load noelle.png", err);
-//};
-//noelleImage.src = "src/noelle.png";
+const qiqiImage = new Image();
+qiqiImage.src = qiqiURL;
+const scaraImage = new Image();
+scaraImage.src = scaraURL;
 
 canvas.addEventListener("mousedown", (event) => {
   cursor.active = true;
   cursor.x = event.offsetX;
   cursor.y = event.offsetY;
-  if (!stickerActive) {
+  if (currentTool == "thin" || currentTool == "thick") {
     currentStroke = [];
     currentStroke.push({ X: cursor.x, Y: cursor.y });
   }
@@ -102,7 +97,6 @@ canvas.addEventListener("drawEvent", () => {
   }
 
   if (currentStroke.length > 0) {
-    context.lineWidth = currentWidth;
     context.beginPath();
     context.moveTo(currentStroke[0].X, currentStroke[0].Y);
     for (let i = 1; i < currentStroke.length; i++) {
@@ -120,27 +114,62 @@ canvas.addEventListener("mousemove", (event) => {
   cursor.x = event.offsetX;
   cursor.y = event.offsetY;
   if (cursor.active) {
-    if (!stickerActive) {
+    if (currentTool === "thin" || currentTool === "thick") {
       currentStroke.push({ X: cursor.x, Y: cursor.y });
+      canvas.dispatchEvent(new Event("drawEvent"));
     }
   } else {
-    if (stickerActive && noelleImage.complete) {
-      preview = DrawImage(
-        noelleImage,
-        cursor.x - 200 / 2,
-        cursor.y - 125 / 2,
-        200,
-        125,
-      );
-    } else {
-      preview = fillCircle({ X: cursor.x, Y: cursor.y }, 5, currentWidth);
+    switch (currentTool) {
+      case "noelle":
+        if (noelleImage.complete) {
+          preview = DrawImage(
+            noelleImage,
+            cursor.x - 200 / 2,
+            cursor.y - 125 / 2,
+            200,
+            125,
+          );
+        }
+        break;
+      case "qiqi":
+        if (qiqiImage.complete) {
+          preview = DrawImage(
+            qiqiImage,
+            cursor.x - 200 / 2,
+            cursor.y - 125 / 2,
+            200,
+            125,
+          );
+        }
+        break;
+      case "scara":
+        if (scaraImage.complete) {
+          preview = DrawImage(
+            scaraImage,
+            cursor.x - 150 / 2,
+            cursor.y - 75 / 2,
+            150,
+            75,
+          );
+        }
+        break;
+      default:
+        preview = fillCircle(
+          { X: cursor.x, Y: cursor.y },
+          1,
+          currentTool === "thin" ? 2 : 5,
+        );
     }
   }
   canvas.dispatchEvent(new Event("drawEvent"));
 });
 
 canvas.addEventListener("mouseup", () => {
-  if (cursor.active && !stickerActive && currentStroke.length > 0) {
+  if (
+    cursor.active && (currentTool === "thin" || currentTool === "thick") &&
+    currentStroke.length > 0
+  ) {
+    const currentWidth = currentTool === "thin" ? 2 : 5;
     const lineCommand = DrawLine([...currentStroke], currentWidth);
     displayList.push(lineCommand);
     currentStroke = [];
@@ -150,22 +179,49 @@ canvas.addEventListener("mouseup", () => {
 });
 
 canvas.addEventListener("click", (event) => {
-  if (!stickerActive) return;
   cursor.x = event.offsetX;
   cursor.y = event.offsetY;
 
-  if (noelleImage.complete) {
-    const stickerCommand = DrawImage(
-      noelleImage,
-      cursor.x - 200 / 2,
-      cursor.y - 125 / 2,
-      200,
-      125,
-    );
-    displayList.push(stickerCommand);
-    preview = null;
-    canvas.dispatchEvent(new Event("drawEvent"));
+  switch (currentTool) {
+    case "noelle":
+      if (noelleImage.complete) {
+        const command = DrawImage(
+          noelleImage,
+          cursor.x - 200 / 2,
+          cursor.y - 125 / 2,
+          200,
+          125,
+        );
+        displayList.push(command);
+      }
+      break;
+    case "qiqi":
+      if (qiqiImage.complete) {
+        const command = DrawImage(
+          qiqiImage,
+          cursor.x - 200 / 2,
+          cursor.y - 125 / 2,
+          200,
+          125,
+        );
+        displayList.push(command);
+      }
+      break;
+    case "scara":
+      if (scaraImage.complete) {
+        const command = DrawImage(
+          scaraImage,
+          cursor.x - 150 / 2,
+          cursor.y - 75 / 2,
+          150,
+          75,
+        );
+        displayList.push(command);
+      }
+      break;
   }
+  preview = null;
+  canvas.dispatchEvent(new Event("drawEvent"));
 });
 
 const clearButton = document.createElement("button");
@@ -204,11 +260,12 @@ thinButton.style.fontSize = "20px";
 document.body.append(thinButton);
 
 thinButton.addEventListener("click", () => {
-  stickerActive = false;
-  currentWidth = 2;
+  currentTool = "thin";
   thinButton.style.outline = "2px solid blue";
   thickButton.style.outline = "";
   noelleStickerButton.style.outline = "";
+  scaraStickerButton.style.outline = "";
+  qiqiStickerButton.style.outline = "";
 });
 
 const thickButton = document.createElement("button");
@@ -217,11 +274,12 @@ thickButton.style.fontSize = "30px";
 document.body.append(thickButton);
 
 thickButton.addEventListener("click", () => {
-  stickerActive = false; //figure out better way for this later
-  currentWidth = 5;
+  currentTool = "thick";
   thickButton.style.outline = "2px solid blue";
   thinButton.style.outline = "";
   noelleStickerButton.style.outline = "";
+  scaraStickerButton.style.outline = "";
+  qiqiStickerButton.style.outline = "";
 });
 
 const noelleStickerButton = document.createElement("button");
@@ -229,18 +287,42 @@ noelleStickerButton.innerHTML = "<img src='" + noelleURL +
   "' width='50' height='35'/>";
 document.body.append(noelleStickerButton);
 
-let stickerActive = false;
+type Tool = "thin" | "thick" | "noelle" | "qiqi" | "scara";
+let currentTool: Tool = "thin";
+
 noelleStickerButton.addEventListener("click", () => {
-  stickerActive = true;
-  currentWidth = 0;
+  currentTool = "noelle";
   noelleStickerButton.style.outline = "2px solid blue";
   thickButton.style.outline = "";
+  scaraStickerButton.style.outline = "";
   thinButton.style.outline = "";
-  //const stickerDrawable: Drawable = {
-  //  display(context: CanvasRenderingContext2D) {
-  //    context.drawImage(noelleImage, cursor.x - 200 / 2, cursor.y - 125 / 2, 200, 125);
-  //  },
-  //};
-  //displayList.push(stickerDrawable);
-  //canvas.dispatchEvent(new Event("drawEvent"));
+  qiqiStickerButton.style.outline = "";
+});
+
+const qiqiStickerButton = document.createElement("button");
+qiqiStickerButton.innerHTML = "<img src='" + qiqiURL +
+  "' width='50' height='35'/>";
+document.body.append(qiqiStickerButton);
+
+qiqiStickerButton.addEventListener("click", () => {
+  currentTool = "qiqi";
+  qiqiStickerButton.style.outline = "2px solid blue";
+  noelleStickerButton.style.outline = "";
+  scaraStickerButton.style.outline = "";
+  thickButton.style.outline = "";
+  thinButton.style.outline = "";
+});
+
+const scaraStickerButton = document.createElement("button");
+scaraStickerButton.innerHTML = "<img src='" + scaraURL +
+  "' width='50' height='35'/>";
+document.body.append(scaraStickerButton);
+
+scaraStickerButton.addEventListener("click", () => {
+  currentTool = "scara";
+  scaraStickerButton.style.outline = "2px solid blue";
+  noelleStickerButton.style.outline = "";
+  qiqiStickerButton.style.outline = "";
+  thickButton.style.outline = "";
+  thinButton.style.outline = "";
 });
