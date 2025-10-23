@@ -1,5 +1,6 @@
 //import exampleIconUrl from "./noun-paperclip-7598668-00449F.png";
 import "./style.css";
+import noelleURL from "./noelle2.png";
 
 document.body.innerHTML = `
   <h1> Herro <h1>
@@ -37,6 +38,20 @@ function DrawLine(points: Point[], width: number) {
     },
   };
 }
+function DrawImage(
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  return {
+    display(context: CanvasRenderingContext2D) {
+      context.drawImage(img, x, y, width, height);
+    },
+  };
+}
+
 let preview: Drawable | null = null;
 //ctx: CanvasRenderingContext2D, x: number, y: number, radius: number
 function fillCircle(point: Point, radius: number, width: number): Drawable {
@@ -56,11 +71,26 @@ const displayList: Drawable[] = [];
 let currentStroke: Point[] = [];
 const undoneStrokes: Drawable[] = [];
 
+const noelleImage = new Image();
+noelleImage.src = noelleURL;
+
+//noelleImage.onload = () => {
+//  console.log("noelle loaded");
+//  context.drawImage(noelleImage, 0, 0, canvas.width, canvas.height);
+//};
+//noelleImage.onerror = (err) => {
+//  console.error("failed to load noelle.png", err);
+//};
+//noelleImage.src = "src/noelle.png";
+
 canvas.addEventListener("mousedown", (event) => {
   cursor.active = true;
   cursor.x = event.offsetX;
   cursor.y = event.offsetY;
-  currentStroke = [];
+  if (!stickerActive) {
+    currentStroke = [];
+    currentStroke.push({ X: cursor.x, Y: cursor.y });
+  }
 });
 
 canvas.addEventListener("drawEvent", () => {
@@ -89,26 +119,53 @@ canvas.addEventListener("drawEvent", () => {
 canvas.addEventListener("mousemove", (event) => {
   cursor.x = event.offsetX;
   cursor.y = event.offsetY;
-
-  if (!cursor.active) {
-    preview = fillCircle({ X: cursor.x, Y: cursor.y }, 5, currentWidth);
-    canvas.dispatchEvent(new Event("drawEvent"));
+  if (cursor.active) {
+    if (!stickerActive) {
+      currentStroke.push({ X: cursor.x, Y: cursor.y });
+    }
   } else {
-    context.fillStyle = gradient; //ill figure out later
-
-    currentStroke.push({ X: cursor.x, Y: cursor.y });
-    canvas.dispatchEvent(new Event("drawEvent"));
+    if (stickerActive && noelleImage.complete) {
+      preview = DrawImage(
+        noelleImage,
+        cursor.x - 200 / 2,
+        cursor.y - 125 / 2,
+        200,
+        125,
+      );
+    } else {
+      preview = fillCircle({ X: cursor.x, Y: cursor.y }, 5, currentWidth);
+    }
   }
+  canvas.dispatchEvent(new Event("drawEvent"));
 });
 
 canvas.addEventListener("mouseup", () => {
-  if (cursor.active && currentStroke.length > 0) {
+  if (cursor.active && !stickerActive && currentStroke.length > 0) {
     const lineCommand = DrawLine([...currentStroke], currentWidth);
     displayList.push(lineCommand);
     currentStroke = [];
   }
   cursor.active = false;
   canvas.dispatchEvent(new Event("drawEvent"));
+});
+
+canvas.addEventListener("click", (event) => {
+  if (!stickerActive) return;
+  cursor.x = event.offsetX;
+  cursor.y = event.offsetY;
+
+  if (noelleImage.complete) {
+    const stickerCommand = DrawImage(
+      noelleImage,
+      cursor.x - 200 / 2,
+      cursor.y - 125 / 2,
+      200,
+      125,
+    );
+    displayList.push(stickerCommand);
+    preview = null;
+    canvas.dispatchEvent(new Event("drawEvent"));
+  }
 });
 
 const clearButton = document.createElement("button");
@@ -147,9 +204,11 @@ thinButton.style.fontSize = "20px";
 document.body.append(thinButton);
 
 thinButton.addEventListener("click", () => {
+  stickerActive = false;
   currentWidth = 2;
   thinButton.style.outline = "2px solid blue";
   thickButton.style.outline = "";
+  noelleStickerButton.style.outline = "";
 });
 
 const thickButton = document.createElement("button");
@@ -158,7 +217,30 @@ thickButton.style.fontSize = "30px";
 document.body.append(thickButton);
 
 thickButton.addEventListener("click", () => {
+  stickerActive = false; //figure out better way for this later
   currentWidth = 5;
   thickButton.style.outline = "2px solid blue";
   thinButton.style.outline = "";
+  noelleStickerButton.style.outline = "";
+});
+
+const noelleStickerButton = document.createElement("button");
+noelleStickerButton.innerHTML = "<img src='" + noelleURL +
+  "' width='50' height='35'/>";
+document.body.append(noelleStickerButton);
+
+let stickerActive = false;
+noelleStickerButton.addEventListener("click", () => {
+  stickerActive = true;
+  currentWidth = 0;
+  noelleStickerButton.style.outline = "2px solid blue";
+  thickButton.style.outline = "";
+  thinButton.style.outline = "";
+  //const stickerDrawable: Drawable = {
+  //  display(context: CanvasRenderingContext2D) {
+  //    context.drawImage(noelleImage, cursor.x - 200 / 2, cursor.y - 125 / 2, 200, 125);
+  //  },
+  //};
+  //displayList.push(stickerDrawable);
+  //canvas.dispatchEvent(new Event("drawEvent"));
 });
