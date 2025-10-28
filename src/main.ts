@@ -1,8 +1,8 @@
 //import exampleIconUrl from "./noun-paperclip-7598668-00449F.png";
-import "./style.css";
 import noelleURL from "./noelle2.png";
 import qiqiURL from "./qiqi2.jpg";
 import scaraURL from "./scara2.webp";
+import "./style.css";
 
 document.body.innerHTML = `
   <h1> Herro <h1>
@@ -65,6 +65,23 @@ function fillCircle(point: Point, radius: number, width: number): Drawable {
     },
   };
 }
+const MAX_WIDTH = 200;
+const MAX_HEIGHT = 125;
+function scaleDimensions(img: HTMLImageElement) {
+  const w = img.width;
+  const h = img.height;
+  const ratio = Math.min(MAX_WIDTH / w, MAX_HEIGHT / h);
+  return { w: w * ratio, h: h * ratio };
+}
+
+function clearOutlines() {
+  thickButton.style.outline = "";
+  thinButton.style.outline = "";
+  noelleStickerButton.style.outline = "";
+  scaraStickerButton.style.outline = "";
+  qiqiStickerButton.style.outline = "";
+  customStickerButton.style.outline = "";
+}
 
 type Point = { X: number; Y: number };
 const displayList: Drawable[] = [];
@@ -89,8 +106,6 @@ canvas.addEventListener("mousedown", (event) => {
 });
 
 canvas.addEventListener("drawEvent", () => {
-  console.log("hi");
-
   context.clearRect(0, 0, canvas.width, canvas.height);
   for (const drawable of displayList) {
     drawable.display(context);
@@ -147,10 +162,24 @@ canvas.addEventListener("mousemove", (event) => {
           preview = DrawImage(
             scaraImage,
             cursor.x - 150 / 2,
-            cursor.y - 75 / 2,
+            cursor.y - 90 / 2,
             150,
-            75,
+            90,
           );
+        }
+        break;
+      case "custom":
+        if (customStickerImage) {
+          const { w, h } = scaleDimensions(customStickerImage);
+          preview = DrawImage(
+            customStickerImage,
+            cursor.x - w / 2,
+            cursor.y - h / 2,
+            w,
+            h,
+          );
+        } else {
+          preview = null;
         }
         break;
       default:
@@ -212,11 +241,26 @@ canvas.addEventListener("click", (event) => {
         const command = DrawImage(
           scaraImage,
           cursor.x - 150 / 2,
-          cursor.y - 75 / 2,
+          cursor.y - 90 / 2,
           150,
-          75,
+          90,
         );
         displayList.push(command);
+      }
+      break;
+    case "custom":
+      if (customStickerImage) {
+        const { w, h } = scaleDimensions(customStickerImage);
+        preview = DrawImage(
+          customStickerImage,
+          cursor.x - w / 2, //- customStickerImage.width + 200,
+          cursor.y - w / 2, //- customStickerImage.height + 125,
+          w,
+          h,
+        );
+        displayList.push(preview);
+      } else {
+        preview = null;
       }
       break;
   }
@@ -261,11 +305,8 @@ document.body.append(thinButton);
 
 thinButton.addEventListener("click", () => {
   currentTool = "thin";
+  clearOutlines();
   thinButton.style.outline = "2px solid blue";
-  thickButton.style.outline = "";
-  noelleStickerButton.style.outline = "";
-  scaraStickerButton.style.outline = "";
-  qiqiStickerButton.style.outline = "";
 });
 
 const thickButton = document.createElement("button");
@@ -275,11 +316,8 @@ document.body.append(thickButton);
 
 thickButton.addEventListener("click", () => {
   currentTool = "thick";
+  clearOutlines();
   thickButton.style.outline = "2px solid blue";
-  thinButton.style.outline = "";
-  noelleStickerButton.style.outline = "";
-  scaraStickerButton.style.outline = "";
-  qiqiStickerButton.style.outline = "";
 });
 
 const noelleStickerButton = document.createElement("button");
@@ -287,16 +325,13 @@ noelleStickerButton.innerHTML = "<img src='" + noelleURL +
   "' width='50' height='35'/>";
 document.body.append(noelleStickerButton);
 
-type Tool = "thin" | "thick" | "noelle" | "qiqi" | "scara";
+type Tool = "thin" | "thick" | "noelle" | "qiqi" | "scara" | "custom";
 let currentTool: Tool = "thin";
 
 noelleStickerButton.addEventListener("click", () => {
   currentTool = "noelle";
+  clearOutlines();
   noelleStickerButton.style.outline = "2px solid blue";
-  thickButton.style.outline = "";
-  scaraStickerButton.style.outline = "";
-  thinButton.style.outline = "";
-  qiqiStickerButton.style.outline = "";
 });
 
 const qiqiStickerButton = document.createElement("button");
@@ -306,11 +341,8 @@ document.body.append(qiqiStickerButton);
 
 qiqiStickerButton.addEventListener("click", () => {
   currentTool = "qiqi";
+  clearOutlines();
   qiqiStickerButton.style.outline = "2px solid blue";
-  noelleStickerButton.style.outline = "";
-  scaraStickerButton.style.outline = "";
-  thickButton.style.outline = "";
-  thinButton.style.outline = "";
 });
 
 const scaraStickerButton = document.createElement("button");
@@ -320,9 +352,35 @@ document.body.append(scaraStickerButton);
 
 scaraStickerButton.addEventListener("click", () => {
   currentTool = "scara";
+  clearOutlines();
   scaraStickerButton.style.outline = "2px solid blue";
-  noelleStickerButton.style.outline = "";
-  qiqiStickerButton.style.outline = "";
-  thickButton.style.outline = "";
-  thinButton.style.outline = "";
+});
+
+const customStickerButton = document.createElement("button");
+customStickerButton.innerHTML = "custom";
+document.body.append(customStickerButton);
+
+let customStickerImage: HTMLImageElement | null = null;
+customStickerButton.addEventListener("click", () => {
+  currentTool = "custom";
+  const url = prompt("Enter image URL for your custom sticker:");
+  if (!url) return;
+
+  const customImg = new Image();
+  customImg.crossOrigin = "anonymous";
+  customImg.src = url;
+
+  alert("Loading image...");
+
+  customImg.onload = () => {
+    alert("Image loaded successfully!");
+    customStickerImage = customImg;
+    canvas.dispatchEvent(new Event("drawEvent"));
+  };
+
+  customImg.onerror = () => {
+    alert("Failed to load image. Please check the URL and try again.");
+  };
+  clearOutlines();
+  customStickerButton.style.outline = "2px solid blue";
 });
