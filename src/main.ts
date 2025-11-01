@@ -5,8 +5,13 @@ import scaraURL from "./scara2.webp";
 import "./style.css";
 
 document.body.innerHTML = `
-  <h1> Herro <h1>
-  <canvas id="cvs"></canvas>
+  <div id="app-container">
+    <div id="tools-left"></div>
+    <div id="cvs-container">
+      <canvas id="cvs"></canvas>
+    </div>
+    <div id="palette-right"></div>
+  </div>
 `;
 
 const canvas = document.getElementById("cvs") as HTMLCanvasElement;
@@ -24,12 +29,12 @@ interface Drawable {
   display(context: CanvasRenderingContext2D): void;
 }
 
-function DrawLine(points: Point[], width: number) {
+function DrawLine(points: Point[], width: number, currentColor: string) {
   return {
     display(context: CanvasRenderingContext2D) {
       if (points.length === 0) return;
       context.lineWidth = width;
-      context.strokeStyle = "black";
+      context.strokeStyle = currentColor;
       context.beginPath();
       context.moveTo(points[0].X, points[0].Y);
       for (let i = 1; i < points.length; i++) {
@@ -112,6 +117,8 @@ canvas.addEventListener("drawEvent", () => {
   }
 
   if (currentStroke.length > 0) {
+    context.lineWidth = currentTool === "thin" ? 2 : 5;
+    context.strokeStyle = currentColor;
     context.beginPath();
     context.moveTo(currentStroke[0].X, currentStroke[0].Y);
     for (let i = 1; i < currentStroke.length; i++) {
@@ -199,7 +206,11 @@ canvas.addEventListener("mouseup", () => {
     currentStroke.length > 0
   ) {
     const currentWidth = currentTool === "thin" ? 2 : 5;
-    const lineCommand = DrawLine([...currentStroke], currentWidth);
+    const lineCommand = DrawLine(
+      [...currentStroke],
+      currentWidth,
+      currentColor,
+    );
     displayList.push(lineCommand);
     currentStroke = [];
   }
@@ -268,9 +279,11 @@ canvas.addEventListener("click", (event) => {
   canvas.dispatchEvent(new Event("drawEvent"));
 });
 
+const toolsLeft = document.getElementById("tools-left")!;
+
 const clearButton = document.createElement("button");
 clearButton.innerHTML = "clear";
-document.body.append(clearButton);
+//document.body.append(clearButton);
 clearButton.addEventListener("click", () => {
   context.clearRect(0, 0, canvas.width, canvas.height);
   displayList.length = 0;
@@ -279,7 +292,7 @@ clearButton.addEventListener("click", () => {
 
 const undoButton = document.createElement("button");
 undoButton.innerHTML = "undo";
-document.body.append(undoButton);
+//document.body.append(undoButton);
 undoButton.addEventListener("click", () => {
   if (displayList.length === 0) return;
   const undoneStroke = displayList.pop()!;
@@ -290,7 +303,7 @@ undoButton.addEventListener("click", () => {
 
 const redoButton = document.createElement("button");
 redoButton.innerHTML = "redo";
-document.body.append(redoButton);
+//document.body.append(redoButton);
 redoButton.addEventListener("click", () => {
   if (undoneStrokes.length === 0) return;
   const redoneStroke = undoneStrokes.pop()!;
@@ -301,7 +314,7 @@ redoButton.addEventListener("click", () => {
 const thinButton = document.createElement("button");
 thinButton.innerHTML = "thin";
 thinButton.style.fontSize = "20px";
-document.body.append(thinButton);
+//document.body.append(thinButton);
 
 thinButton.addEventListener("click", () => {
   currentTool = "thin";
@@ -312,7 +325,7 @@ thinButton.addEventListener("click", () => {
 const thickButton = document.createElement("button");
 thickButton.innerHTML = "thick";
 thickButton.style.fontSize = "30px";
-document.body.append(thickButton);
+//document.body.append(thickButton);
 
 thickButton.addEventListener("click", () => {
   currentTool = "thick";
@@ -323,7 +336,7 @@ thickButton.addEventListener("click", () => {
 const noelleStickerButton = document.createElement("button");
 noelleStickerButton.innerHTML = "<img src='" + noelleURL +
   "' width='50' height='35'/>";
-document.body.append(noelleStickerButton);
+//document.body.append(noelleStickerButton);
 
 type Tool = "thin" | "thick" | "noelle" | "qiqi" | "scara" | "custom";
 let currentTool: Tool = "thin";
@@ -337,7 +350,7 @@ noelleStickerButton.addEventListener("click", () => {
 const qiqiStickerButton = document.createElement("button");
 qiqiStickerButton.innerHTML = "<img src='" + qiqiURL +
   "' width='50' height='35'/>";
-document.body.append(qiqiStickerButton);
+//document.body.append(qiqiStickerButton);
 
 qiqiStickerButton.addEventListener("click", () => {
   currentTool = "qiqi";
@@ -348,7 +361,7 @@ qiqiStickerButton.addEventListener("click", () => {
 const scaraStickerButton = document.createElement("button");
 scaraStickerButton.innerHTML = "<img src='" + scaraURL +
   "' width='50' height='35'/>";
-document.body.append(scaraStickerButton);
+//document.body.append(scaraStickerButton);
 
 scaraStickerButton.addEventListener("click", () => {
   currentTool = "scara";
@@ -358,7 +371,7 @@ scaraStickerButton.addEventListener("click", () => {
 
 const customStickerButton = document.createElement("button");
 customStickerButton.innerHTML = "custom";
-document.body.append(customStickerButton);
+//document.body.append(customStickerButton);
 
 let customStickerImage: HTMLImageElement | null = null;
 customStickerButton.addEventListener("click", () => {
@@ -387,7 +400,7 @@ customStickerButton.addEventListener("click", () => {
 
 const exportButton = document.createElement("button");
 exportButton.innerHTML = "export";
-document.body.append(exportButton);
+//document.body.append(exportButton);
 exportButton.addEventListener("click", () => {
   const tempCanvas = document.createElement("canvas");
   tempCanvas.width = 1024;
@@ -404,3 +417,45 @@ exportButton.addEventListener("click", () => {
 });
 
 thinButton.style.outline = "2px solid blue";
+
+toolsLeft?.append(
+  thinButton,
+  thickButton,
+  noelleStickerButton,
+  qiqiStickerButton,
+  scaraStickerButton,
+  customStickerButton,
+  undoButton,
+  redoButton,
+  clearButton,
+  exportButton,
+);
+
+const COLORS = [
+  "black",
+  "red",
+  "green",
+  "blue",
+  "yellow",
+  "purple",
+  "orange",
+  "pink",
+];
+let currentColor = "black";
+const paletteRight = document.getElementById("palette-right")!;
+
+COLORS.forEach((color) => {
+  const button = document.createElement("button");
+  button.style.backgroundColor = color;
+  button.style.width = "30px";
+  button.style.height = "30px";
+  button.title = `Set color to ${color}`;
+  button.onclick = () => {
+    currentColor = color;
+    document.querySelectorAll("#palette-right button").forEach((b) => {
+      (b as HTMLElement).style.outline = "";
+    });
+    button.style.outline = "2px solid blue";
+  };
+  paletteRight.append(button);
+});
