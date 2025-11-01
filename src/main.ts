@@ -384,3 +384,23 @@ customStickerButton.addEventListener("click", () => {
   clearOutlines();
   customStickerButton.style.outline = "2px solid blue";
 });
+
+const exportButton = document.createElement("button");
+exportButton.innerHTML = "export";
+document.body.append(exportButton);
+exportButton.addEventListener("click", () => {
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = 1024;
+  tempCanvas.height = 1024;
+  const ctx = tempCanvas.getContext("2d");
+  ctx?.scale(4, 4);
+  displayList.forEach((drawable) => {
+    drawable.display(ctx!);
+  });
+  const anchor = document.createElement("a");
+  anchor.href = canvas.toDataURL("image/png");
+  anchor.download = "canvas_export.png";
+  anchor.click();
+});
+
+thinButton.style.outline = "2px solid blue";
