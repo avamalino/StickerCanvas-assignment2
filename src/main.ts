@@ -4,6 +4,7 @@ import qiqiURL from "./qiqi2.jpg";
 import scaraURL from "./scara2.webp";
 import "./style.css";
 
+//Dom setup
 document.body.innerHTML = `
   <div id="app-container">
     <div id="tools-left"></div>
@@ -15,20 +16,28 @@ document.body.innerHTML = `
 `;
 
 const canvas = document.getElementById("cvs") as HTMLCanvasElement;
-canvas.id = "cvs";
-canvas.width = 560;
-canvas.height = 560;
+canvas.width = 512;
+canvas.height = 512;
 const context = canvas.getContext("2d")!;
-const gradient = context.createLinearGradient(0, 0, 200, 0);
-gradient.addColorStop(0, "pink");
-gradient.addColorStop(1, "purple");
 
-const cursor = { active: false, x: 0, y: 0 };
+//application state
+type Point = { X: number; Y: number };
+type Tool = "thin" | "thick" | "noelle" | "qiqi" | "scara" | "custom" | "text";
 
 interface Drawable {
   display(context: CanvasRenderingContext2D): void;
 }
 
+let currentTool: Tool = "thin";
+let currentColor = "black";
+const cursor = { active: false, x: 0, y: 0 };
+const displayList: Drawable[] = [];
+let currentStroke: Point[] = [];
+const undoneStrokes: Drawable[] = [];
+let preview: Drawable | null = null;
+let customStickerImage: HTMLImageElement | null = null;
+
+//Drawable Factory Functions
 function DrawLine(points: Point[], width: number, currentColor: string) {
   return {
     display(context: CanvasRenderingContext2D) {
@@ -44,6 +53,7 @@ function DrawLine(points: Point[], width: number, currentColor: string) {
     },
   };
 }
+
 function DrawImage(
   img: HTMLImageElement,
   x: number,
@@ -58,7 +68,23 @@ function DrawImage(
   };
 }
 
-let preview: Drawable | null = null;
+function DrawText(
+  text: string,
+  x: number,
+  y: number,
+  color: string = "black",
+  fontSize: number = 20,
+): Drawable {
+  return {
+    display(context: CanvasRenderingContext2D) {
+      context.fillStyle = color;
+      context.font = `${fontSize}px sans-serif`;
+      context.textBaseline = "middle";
+      context.fillText(text, x, y);
+    },
+  };
+}
+//preview circle when sticker buttons not active
 function fillCircle(point: Point, radius: number, width: number): Drawable {
   return {
     display(context: CanvasRenderingContext2D) {
@@ -70,46 +96,129 @@ function fillCircle(point: Point, radius: number, width: number): Drawable {
     },
   };
 }
+
+//Image Loading and Scaling
 const MAX_WIDTH = 200;
 const MAX_HEIGHT = 125;
+
 function scaleDimensions(img: HTMLImageElement) {
-  const w = img.width;
-  const h = img.height;
-  const ratio = Math.min(MAX_WIDTH / w, MAX_HEIGHT / h);
-  return { w: w * ratio, h: h * ratio };
+  const ratio = Math.min(MAX_WIDTH / img.width, MAX_HEIGHT / img.height);
+  return { w: img.width * ratio, h: img.height * ratio };
 }
 
+//initialize images
+const images: { [K in "noelle" | "qiqi" | "scara"]: HTMLImageElement } = {
+  noelle: new Image(),
+  qiqi: new Image(),
+  scara: new Image(),
+};
+
+images.noelle.src = noelleURL;
+images.qiqi.src = qiqiURL;
+images.scara.src = scaraURL;
+
+//redraw strokes
+function redraw() {
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  displayList.forEach((d) => d.display(context));
+
+  if (currentStroke.length > 1) {
+    const width = currentTool === "thin" ? 2 : 5;
+    context.lineWidth = width;
+    context.strokeStyle = currentColor;
+    context.beginPath();
+    context.moveTo(currentStroke[0].X, currentStroke[0].Y);
+    for (let i = 1; i < currentStroke.length; i++) {
+      context.lineTo(currentStroke[i].X, currentStroke[i].Y);
+    }
+    context.stroke();
+  }
+  if (!cursor.active && preview) {
+    preview.display(context);
+  }
+}
+
+//updates the line preview or sticker preview
+function updatePreview() {
+  if (currentTool === "text") {
+    preview = DrawText("A", cursor.x, cursor.y, "black", 16);
+    return;
+  }
+
+  switch (currentTool) {
+    case "noelle":
+      if (images.noelle.complete) {
+        preview = DrawImage(
+          images.noelle,
+          cursor.x - 200 / 2,
+          cursor.y - 125 / 2,
+          200,
+          125,
+        );
+      }
+      break;
+    case "qiqi":
+      if (images.qiqi.complete) {
+        preview = DrawImage(
+          images.qiqi,
+          cursor.x - 200 / 2,
+          cursor.y - 125 / 2,
+          200,
+          125,
+        );
+      }
+      break;
+    case "scara":
+      if (images.scara.complete) {
+        preview = DrawImage(
+          images.scara,
+          cursor.x - 150 / 2,
+          cursor.y - 90 / 2,
+          150,
+          90,
+        );
+      }
+      break;
+    case "custom":
+      if (customStickerImage) {
+        const { w, h } = scaleDimensions(customStickerImage);
+        preview = DrawImage(
+          customStickerImage,
+          cursor.x - w / 2,
+          cursor.y - h / 2,
+          w,
+          h,
+        );
+      } else {
+        preview = null;
+      }
+      break;
+    default:
+      preview = fillCircle(
+        { X: cursor.x, Y: cursor.y },
+        1,
+        currentTool === "thin" ? 2 : 5,
+      );
+  }
+}
+
+//clears all button outlines then in each button, makes current one blue
 function clearOutlines() {
-  thickButton.style.outline = "";
-  thinButton.style.outline = "";
-  noelleStickerButton.style.outline = "";
-  scaraStickerButton.style.outline = "";
-  qiqiStickerButton.style.outline = "";
-  customStickerButton.style.outline = "";
+  document.querySelectorAll("#tools-left button, #palette-right button")
+    .forEach((b) => (b as HTMLElement).style.outline = "");
 }
 
-type Point = { X: number; Y: number };
-const displayList: Drawable[] = [];
-let currentStroke: Point[] = [];
-const undoneStrokes: Drawable[] = [];
-
-const noelleImage = new Image();
-noelleImage.src = noelleURL;
-const qiqiImage = new Image();
-qiqiImage.src = qiqiURL;
-const scaraImage = new Image();
-scaraImage.src = scaraURL;
-
+//on mouse down
 canvas.addEventListener("mousedown", (event) => {
   cursor.active = true;
   cursor.x = event.offsetX;
   cursor.y = event.offsetY;
   if (currentTool == "thin" || currentTool == "thick") {
-    currentStroke = [];
-    currentStroke.push({ X: cursor.x, Y: cursor.y });
+    currentStroke = [{ X: cursor.x, Y: cursor.y }];
   }
 });
 
+//what actually happens while drawing
 canvas.addEventListener("drawEvent", () => {
   context.clearRect(0, 0, canvas.width, canvas.height);
   for (const drawable of displayList) {
@@ -132,305 +241,182 @@ canvas.addEventListener("drawEvent", () => {
   }
 });
 
+//what happens while ur mouse moves
 canvas.addEventListener("mousemove", (event) => {
   cursor.x = event.offsetX;
   cursor.y = event.offsetY;
   if (cursor.active) {
     if (currentTool === "thin" || currentTool === "thick") {
       currentStroke.push({ X: cursor.x, Y: cursor.y });
-      canvas.dispatchEvent(new Event("drawEvent"));
+      redraw();
     }
   } else {
-    switch (currentTool) {
-      case "noelle":
-        if (noelleImage.complete) {
-          preview = DrawImage(
-            noelleImage,
-            cursor.x - 200 / 2,
-            cursor.y - 125 / 2,
-            200,
-            125,
-          );
-        }
-        break;
-      case "qiqi":
-        if (qiqiImage.complete) {
-          preview = DrawImage(
-            qiqiImage,
-            cursor.x - 200 / 2,
-            cursor.y - 125 / 2,
-            200,
-            125,
-          );
-        }
-        break;
-      case "scara":
-        if (scaraImage.complete) {
-          preview = DrawImage(
-            scaraImage,
-            cursor.x - 150 / 2,
-            cursor.y - 90 / 2,
-            150,
-            90,
-          );
-        }
-        break;
-      case "custom":
-        if (customStickerImage) {
-          const { w, h } = scaleDimensions(customStickerImage);
-          preview = DrawImage(
-            customStickerImage,
-            cursor.x - w / 2,
-            cursor.y - h / 2,
-            w,
-            h,
-          );
-        } else {
-          preview = null;
-        }
-        break;
-      default:
-        preview = fillCircle(
-          { X: cursor.x, Y: cursor.y },
-          1,
-          currentTool === "thin" ? 2 : 5,
-        );
-    }
+    updatePreview();
+    redraw();
   }
-  canvas.dispatchEvent(new Event("drawEvent"));
 });
 
+//what happens when u let go of mouse
 canvas.addEventListener("mouseup", () => {
   if (
-    cursor.active && (currentTool === "thin" || currentTool === "thick") &&
-    currentStroke.length > 0
+    cursor.active && (currentTool === "thin" || currentTool === "thick")
   ) {
-    const currentWidth = currentTool === "thin" ? 2 : 5;
-    const lineCommand = DrawLine(
-      [...currentStroke],
-      currentWidth,
-      currentColor,
-    );
-    displayList.push(lineCommand);
+    if (currentStroke.length > 1) {
+      const width = currentTool === "thin" ? 2 : 5;
+      displayList.push(DrawLine([...currentStroke], width, currentColor));
+    }
     currentStroke = [];
   }
   cursor.active = false;
-  canvas.dispatchEvent(new Event("drawEvent"));
+  redraw();
 });
 
+//clicking to add stickers or text to canvas
 canvas.addEventListener("click", (event) => {
-  cursor.x = event.offsetX;
-  cursor.y = event.offsetY;
+  const x = event.offsetX;
+  const y = event.offsetY;
 
   switch (currentTool) {
     case "noelle":
-      if (noelleImage.complete) {
-        const command = DrawImage(
-          noelleImage,
-          cursor.x - 200 / 2,
-          cursor.y - 125 / 2,
-          200,
-          125,
-        );
-        displayList.push(command);
-      }
-      break;
     case "qiqi":
-      if (qiqiImage.complete) {
-        const command = DrawImage(
-          qiqiImage,
-          cursor.x - 200 / 2,
-          cursor.y - 125 / 2,
-          200,
-          125,
-        );
-        displayList.push(command);
+    case "scara": {
+      const img = images[currentTool];
+      if (img.complete) {
+        const { w, h } = scaleDimensions(img);
+        displayList.push(DrawImage(img, x - w / 2, y - h / 2, w, h));
       }
       break;
-    case "scara":
-      if (scaraImage.complete) {
-        const command = DrawImage(
-          scaraImage,
-          cursor.x - 150 / 2,
-          cursor.y - 90 / 2,
-          150,
-          90,
-        );
-        displayList.push(command);
-      }
-      break;
-    case "custom":
+    }
+
+    case "custom": {
       if (customStickerImage) {
         const { w, h } = scaleDimensions(customStickerImage);
-        preview = DrawImage(
-          customStickerImage,
-          cursor.x - w / 2, //- customStickerImage.width + 200,
-          cursor.y - w / 2, //- customStickerImage.height + 125,
-          w,
-          h,
+        displayList.push(
+          DrawImage(customStickerImage, x - w / 2, y - h / 2, w, h),
         );
-        displayList.push(preview);
-      } else {
-        preview = null;
+      }
+      break;
+    }
+
+    case "text":
+      {
+        const userText = prompt("Enter text or emoji:", "😊");
+        if (userText === null) return;
+
+        const sizeInput = prompt("Font size (pixels):", "24");
+        const fontSize = parseInt(sizeInput!) || 24;
+
+        displayList.push(
+          DrawText(userText, x, y, currentColor, fontSize),
+        );
+        redraw();
       }
       break;
   }
   preview = null;
-  canvas.dispatchEvent(new Event("drawEvent"));
+  redraw();
 });
 
+//creating buttons and placing them in div containers
 const toolsLeft = document.getElementById("tools-left")!;
+const paletteRight = document.getElementById("palette-right")!;
 
-const clearButton = document.createElement("button");
-clearButton.innerHTML = "clear";
-//document.body.append(clearButton);
-clearButton.addEventListener("click", () => {
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  displayList.length = 0;
-  undoneStrokes.length = 0;
-});
+function createButton(label: string, parent: HTMLElement, handler: () => void) {
+  const button = document.createElement("button");
+  button.innerHTML = label;
+  button.addEventListener("click", handler);
+  parent.appendChild(button);
+  return button;
+}
 
-const undoButton = document.createElement("button");
-undoButton.innerHTML = "undo";
-//document.body.append(undoButton);
-undoButton.addEventListener("click", () => {
-  if (displayList.length === 0) return;
-  const undoneStroke = displayList.pop()!;
-  undoneStrokes.push(undoneStroke);
-  canvas.dispatchEvent(new Event("drawEvent"));
-  console.log(undoneStroke);
-});
-
-const redoButton = document.createElement("button");
-redoButton.innerHTML = "redo";
-//document.body.append(redoButton);
-redoButton.addEventListener("click", () => {
-  if (undoneStrokes.length === 0) return;
-  const redoneStroke = undoneStrokes.pop()!;
-  displayList.push(redoneStroke);
-  canvas.dispatchEvent(new Event("drawEvent"));
-});
-
-const thinButton = document.createElement("button");
-thinButton.innerHTML = "thin";
-thinButton.style.fontSize = "20px";
-//document.body.append(thinButton);
-
-thinButton.addEventListener("click", () => {
+const thinButton = createButton("thin", toolsLeft, () => {
   currentTool = "thin";
   clearOutlines();
   thinButton.style.outline = "2px solid blue";
 });
 
-const thickButton = document.createElement("button");
-thickButton.innerHTML = "thick";
-thickButton.style.fontSize = "30px";
-//document.body.append(thickButton);
-
-thickButton.addEventListener("click", () => {
+const thickButton = createButton("thick", toolsLeft, () => {
   currentTool = "thick";
   clearOutlines();
   thickButton.style.outline = "2px solid blue";
 });
 
-const noelleStickerButton = document.createElement("button");
-noelleStickerButton.innerHTML = "<img src='" + noelleURL +
-  "' width='50' height='35'/>";
-//document.body.append(noelleStickerButton);
-
-type Tool = "thin" | "thick" | "noelle" | "qiqi" | "scara" | "custom";
-let currentTool: Tool = "thin";
-
-noelleStickerButton.addEventListener("click", () => {
-  currentTool = "noelle";
-  clearOutlines();
-  noelleStickerButton.style.outline = "2px solid blue";
+["noelle", "qiqi", "scara"].forEach((name) => {
+  const button = document.createElement("button");
+  const img = images[name as keyof typeof images];
+  button.innerHTML = `<img src="${img.src}" width="50" height="35">`;
+  button.addEventListener("click", () => {
+    currentTool = name as Tool;
+    clearOutlines();
+    button.style.outline = "2px solid blue";
+  });
+  toolsLeft.appendChild(button);
 });
 
-const qiqiStickerButton = document.createElement("button");
-qiqiStickerButton.innerHTML = "<img src='" + qiqiURL +
-  "' width='50' height='35'/>";
-//document.body.append(qiqiStickerButton);
-
-qiqiStickerButton.addEventListener("click", () => {
-  currentTool = "qiqi";
-  clearOutlines();
-  qiqiStickerButton.style.outline = "2px solid blue";
-});
-
-const scaraStickerButton = document.createElement("button");
-scaraStickerButton.innerHTML = "<img src='" + scaraURL +
-  "' width='50' height='35'/>";
-//document.body.append(scaraStickerButton);
-
-scaraStickerButton.addEventListener("click", () => {
-  currentTool = "scara";
-  clearOutlines();
-  scaraStickerButton.style.outline = "2px solid blue";
-});
-
-const customStickerButton = document.createElement("button");
-customStickerButton.innerHTML = "custom";
-//document.body.append(customStickerButton);
-
-let customStickerImage: HTMLImageElement | null = null;
-customStickerButton.addEventListener("click", () => {
+const customStickerButton = createButton("custom", toolsLeft, () => {
   currentTool = "custom";
-  const url = prompt("Enter image URL for your custom sticker:");
-  if (!url) return;
-
-  const customImg = new Image();
-  customImg.crossOrigin = "anonymous";
-  customImg.src = url;
-
-  alert("Loading image...");
-
-  customImg.onload = () => {
-    alert("Image loaded successfully!");
-    customStickerImage = customImg;
-    canvas.dispatchEvent(new Event("drawEvent"));
-  };
-
-  customImg.onerror = () => {
-    alert("Failed to load image. Please check the URL and try again.");
-  };
   clearOutlines();
   customStickerButton.style.outline = "2px solid blue";
+  const url = prompt("Enter image URL for your custom sticker:");
+  if (!url) return;
+  const img = new Image();
+  img.src = url;
+  img.onload = () => {
+    customStickerImage = img;
+    alert("Image loaded!");
+    redraw();
+  };
+  img.onerror = () => {
+    alert("Failed to load image. Check the URL.");
+  };
 });
 
-const exportButton = document.createElement("button");
-exportButton.innerHTML = "export";
-//document.body.append(exportButton);
-exportButton.addEventListener("click", () => {
+const textButton = createButton("text", toolsLeft, () => {
+  currentTool = "text";
+  clearOutlines();
+  textButton.style.outline = "2px solid blue";
+});
+
+createButton("undo", toolsLeft, () => {
+  if (displayList.length > 0) {
+    undoneStrokes.push(displayList.pop()!);
+    redraw();
+  }
+});
+
+createButton("redo", toolsLeft, () => {
+  if (undoneStrokes.length > 0) {
+    displayList.push(undoneStrokes.pop()!);
+    redraw();
+  }
+});
+
+createButton("clear", toolsLeft, () => {
+  displayList.length = 0;
+  undoneStrokes.length = 0;
+  preview = null;
+  redraw();
+});
+
+createButton("export", toolsLeft, () => {
   const tempCanvas = document.createElement("canvas");
   tempCanvas.width = 1024;
   tempCanvas.height = 1024;
-  const ctx = tempCanvas.getContext("2d");
-  ctx?.scale(4, 4);
+  const tempCtx = tempCanvas.getContext("2d");
+  if (!tempCtx) return;
+
+  tempCtx.scale(2, 2);
   displayList.forEach((drawable) => {
-    drawable.display(ctx!);
+    drawable.display(tempCtx);
   });
+
   const anchor = document.createElement("a");
-  anchor.href = canvas.toDataURL("image/png");
+  anchor.href = tempCanvas.toDataURL("image/png");
   anchor.download = "canvas_export.png";
   anchor.click();
 });
 
-thinButton.style.outline = "2px solid blue";
-
-toolsLeft?.append(
-  thinButton,
-  thickButton,
-  noelleStickerButton,
-  qiqiStickerButton,
-  scaraStickerButton,
-  customStickerButton,
-  undoButton,
-  redoButton,
-  clearButton,
-  exportButton,
-);
-
+//same thing but with the colors on right side
 const COLORS = [
   "black",
   "red",
@@ -441,8 +427,6 @@ const COLORS = [
   "orange",
   "pink",
 ];
-let currentColor = "black";
-const paletteRight = document.getElementById("palette-right")!;
 
 COLORS.forEach((color) => {
   const button = document.createElement("button");
@@ -459,3 +443,8 @@ COLORS.forEach((color) => {
   };
   paletteRight.append(button);
 });
+
+(paletteRight.firstChild as HTMLElement)?.style?.setProperty(
+  "outline",
+  "2px solid blue",
+);
